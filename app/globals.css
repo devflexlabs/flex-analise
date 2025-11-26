@@ -1,0 +1,83 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-poppins: 'Poppins', sans-serif;
+  
+  /* Cores Grupo Flex - Paleta oficial */
+  --flex-primary: #1e3a8a; /* Azul escuro principal (card 03) */
+  --flex-accent-coral: #FF6B6B; /* Coral/vermelho-rosado (card 01) */
+  --flex-accent-orange: #FF8C42; /* Laranja brilhante (card 02) */
+  --flex-accent-green: #00C853; /* Verde vibrante (card 04) */
+  --flex-gray-light: #f1f5f9; /* Cinza claro de fundo */
+  --flex-gray: #64748b; /* Cinza médio */
+  --flex-gray-dark: #334155; /* Cinza escuro */
+  --flex-black: #000000; /* Preto para botões */
+}
+
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--font-poppins);
+  color: #1e293b;
+  background: #f1f5f9;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  
+  .animate-fade-in {
+    animation: fadeIn 0.5s ease-in;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Scrollbar personalizada */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #64748b;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  opacity: 0.7;
+}
+
+/* Toast customizado */
+[data-sonner-toast] {
+  background: #ffffff !important;
+  color: #1e293b !important;
+  border: 1px solid #e2e8f0 !important;
+  font-family: var(--font-poppins) !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
+}
+
+

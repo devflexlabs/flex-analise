@@ -77,6 +77,49 @@ export function ContractResults({ results }: ContractResultsProps) {
 
     yPos += 5;
 
+    // Informações do Veículo
+    if (results.veiculo_marca || results.veiculo_modelo || results.veiculo_ano || results.veiculo_cor) {
+      if (yPos > 250) {
+        doc.addPage();
+        yPos = margin;
+      }
+
+      doc.setFontSize(16);
+      doc.setFont("helvetica", "bold");
+      doc.text("Informações do Veículo", margin, yPos);
+      yPos += 10;
+
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "normal");
+
+      if (results.veiculo_marca) {
+        doc.text(`Marca: ${results.veiculo_marca}`, margin, yPos);
+        yPos += 7;
+      }
+
+      if (results.veiculo_modelo) {
+        doc.text(`Modelo: ${results.veiculo_modelo}`, margin, yPos);
+        yPos += 7;
+      }
+
+      if (results.veiculo_ano) {
+        doc.text(`Ano: ${results.veiculo_ano}`, margin, yPos);
+        yPos += 7;
+      }
+
+      if (results.veiculo_cor) {
+        doc.text(`Cor: ${results.veiculo_cor}`, margin, yPos);
+        yPos += 7;
+      }
+
+      if (results.veiculo_placa) {
+        doc.text(`Placa: ${results.veiculo_placa}`, margin, yPos);
+        yPos += 7;
+      }
+
+      yPos += 5;
+    }
+
     // Valores
     if (yPos > 250) {
       doc.addPage();
@@ -241,6 +284,51 @@ export function ContractResults({ results }: ContractResultsProps) {
             </div>
           </div>
         </div>
+
+        {/* Card de Informações do Veículo */}
+        {(results.veiculo_marca || results.veiculo_modelo || results.veiculo_ano || results.veiculo_cor) && (
+          <div className="relative overflow-hidden bg-white rounded-2xl p-8 shadow-xl border-2 border-[#cbd5e1]">
+            <div className="absolute top-0 left-0 w-32 h-32 bg-[#00C853]/5 rounded-full -ml-16 -mt-16"></div>
+            <div className="relative">
+              <div className="flex items-center gap-2 mb-6">
+                <div className="w-1 h-8 bg-[#00C853] rounded-full"></div>
+                <h3 className="text-lg font-bold text-[#1e3a8a]">Informações do Veículo</h3>
+              </div>
+              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                {results.veiculo_marca && (
+                  <div className="space-y-1">
+                    <span className="text-xs font-medium text-[#64748b] uppercase tracking-wide">Marca</span>
+                    <p className="text-lg font-semibold text-[#1e293b]">{results.veiculo_marca}</p>
+                  </div>
+                )}
+                {results.veiculo_modelo && (
+                  <div className="space-y-1">
+                    <span className="text-xs font-medium text-[#64748b] uppercase tracking-wide">Modelo</span>
+                    <p className="text-lg font-semibold text-[#1e293b]">{results.veiculo_modelo}</p>
+                  </div>
+                )}
+                {results.veiculo_ano && (
+                  <div className="space-y-1">
+                    <span className="text-xs font-medium text-[#64748b] uppercase tracking-wide">Ano</span>
+                    <p className="text-lg font-semibold text-[#1e293b]">{results.veiculo_ano}</p>
+                  </div>
+                )}
+                {results.veiculo_cor && (
+                  <div className="space-y-1">
+                    <span className="text-xs font-medium text-[#64748b] uppercase tracking-wide">Cor</span>
+                    <p className="text-lg font-semibold text-[#1e293b]">{results.veiculo_cor}</p>
+                  </div>
+                )}
+                {results.veiculo_placa && (
+                  <div className="space-y-1 sm:col-span-2 lg:col-span-4">
+                    <span className="text-xs font-medium text-[#64748b] uppercase tracking-wide">Placa</span>
+                    <p className="text-lg font-semibold text-[#1e293b]">{results.veiculo_placa}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Seção média: Valores financeiros em cards horizontais */}
         <div className="grid md:grid-cols-2 gap-6">

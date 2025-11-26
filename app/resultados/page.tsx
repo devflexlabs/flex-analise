@@ -9,8 +9,15 @@ function ResultadosContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [results, setResults] = useState<any>(null);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!mounted) return;
+    
     console.log("ResultadosContent montado");
     console.log("searchParams:", searchParams.toString());
     
@@ -18,25 +25,26 @@ function ResultadosContent() {
     const data = searchParams.get("data");
     
     if (fromStorage === "true") {
-      // Busca dados do sessionStorage
+      // Busca dados do sessionStorage (só funciona no cliente)
       console.log("Buscando dados do sessionStorage");
-      const storedData = sessionStorage.getItem('contractResults');
-      if (storedData) {
-        try {
-          const parsed = JSON.parse(storedData);
-          console.log("Dados parseados do storage:", parsed);
-          setResults(parsed);
-          // Não remove imediatamente, deixa para limpar depois
-          return;
-        } catch (e) {
-          console.error("Erro ao parsear dados do storage:", e);
-          setTimeout(() => router.push("/"), 100);
+      if (typeof window !== "undefined") {
+        const storedData = sessionStorage.getItem('contractResults');
+        if (storedData) {
+          try {
+            const parsed = JSON.parse(storedData);
+            console.log("Dados parseados do storage:", parsed);
+            setResults(parsed);
+            return;
+          } catch (e) {
+            console.error("Erro ao parsear dados do storage:", e);
+            router.push("/");
+            return;
+          }
+        } else {
+          console.error("Nenhum dado encontrado no sessionStorage");
+          router.push("/");
           return;
         }
-      } else {
-        console.error("Nenhum dado encontrado no sessionStorage");
-        setTimeout(() => router.push("/"), 100);
-        return;
       }
     }
     
@@ -48,15 +56,15 @@ function ResultadosContent() {
         setResults(parsed);
       } catch (e) {
         console.error("Erro ao parsear dados:", e);
-        setTimeout(() => router.push("/"), 100);
+        router.push("/");
       }
     } else if (!fromStorage) {
       console.error("Nenhum parâmetro 'data' ou 'fromStorage' encontrado");
-      setTimeout(() => router.push("/"), 100);
+      router.push("/");
     }
-  }, [searchParams, router]);
+  }, [searchParams, router, mounted]);
 
-  if (!results) {
+  if (!mounted || !results) {
     return (
       <main className="min-h-screen bg-[#f1f5f9] text-[#1e293b] flex items-center justify-center">
         <div className="text-center">

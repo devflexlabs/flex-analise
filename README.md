@@ -1,6 +1,6 @@
 # Flex Análise - Grupo Flex
 
-Aplicação web para análise inteligente de contratos financeiros usando inteligência artificial.
+Aplicação web para análise inteligente de contratos financeiros usando IA.
 
 ## 🚀 Tecnologias
 

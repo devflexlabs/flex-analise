@@ -1,5 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 
+// Método GET para debug/health check
+export async function GET(request: NextRequest) {
+  return NextResponse.json({ 
+    message: "Extract API está funcionando",
+    pythonApiUrl: process.env.PYTHON_API_URL || "não configurado"
+  });
+}
+
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
@@ -17,7 +25,11 @@ export async function POST(request: NextRequest) {
     pythonFormData.append("file", file);
 
     // URL da API Python (ajuste conforme necessário)
-    const apiUrl = process.env.PYTHON_API_URL || "http://localhost:8000/api/extract";
+    const apiUrl = process.env.PYTHON_API_URL 
+      ? `${process.env.PYTHON_API_URL}/api/extract`
+      : "http://localhost:8000/api/extract";
+    
+    console.log("[Extract API] Chamando backend:", apiUrl);
 
     const response = await fetch(apiUrl, {
       method: "POST",

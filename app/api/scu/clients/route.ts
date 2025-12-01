@@ -4,18 +4,24 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
+    // Ensure profile_pic is always a string (empty string if not provided) to avoid validation errors
+    const cleanedBody = { ...body };
+    if (!cleanedBody.profile_pic || cleanedBody.profile_pic === null || cleanedBody.profile_pic === undefined) {
+      cleanedBody.profile_pic = '';
+    }
+
     // URL da API do SCU
     const scuApiUrl = process.env.SCU_API_URL || "https://cadastro-unico-api-production.up.railway.app";
     const url = `${scuApiUrl}/api/clients`;
 
-    console.log(`[SCU Proxy] Criando cliente:`, body);
+    console.log(`[SCU Proxy] Criando cliente:`, cleanedBody);
 
     const response = await fetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify(cleanedBody),
     });
 
     console.log(`[SCU Proxy] Status code: ${response.status}`);
@@ -38,6 +44,9 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+
+
 
 
 

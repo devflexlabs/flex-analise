@@ -25,6 +25,8 @@ export async function GET(
     const data = await response.json();
 
     if (response.ok) {
+      console.log(`[SCU Proxy] Casos retornados:`, data.cases?.length || 0, 'casos');
+      console.log(`[SCU Proxy] Estrutura da resposta:`, JSON.stringify(data, null, 2).substring(0, 500));
       return NextResponse.json(data, { status: 200 });
     } else {
       return NextResponse.json(
@@ -40,5 +42,8 @@ export async function GET(
     );
   }
 }
+
+
+
 
 

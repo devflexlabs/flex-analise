@@ -195,16 +195,16 @@ export function UpdateClientDialog({
       const updates: string[] = [];
 
       // Atualizar dados do cliente individualmente
-      const clientUpdate: any = {};
+        const clientUpdate: any = {};
       if (updatesToApply.clientName && contractData.nome_cliente && contractData.nome_cliente !== clientData?.full_name) {
-        clientUpdate.full_name = contractData.nome_cliente;
-      }
-      if (updatesToApply.clientCpf && contractData.cpf_cnpj) {
-        const cpfLimpo = contractData.cpf_cnpj.replace(/\D/g, "");
-        if (cpfLimpo.length === 11 && cpfLimpo !== clientData?.cpf?.replace(/\D/g, "")) {
-          clientUpdate.cpf = cpfLimpo;
+          clientUpdate.full_name = contractData.nome_cliente;
         }
-      }
+      if (updatesToApply.clientCpf && contractData.cpf_cnpj) {
+          const cpfLimpo = contractData.cpf_cnpj.replace(/\D/g, "");
+          if (cpfLimpo.length === 11 && cpfLimpo !== clientData?.cpf?.replace(/\D/g, "")) {
+            clientUpdate.cpf = cpfLimpo;
+          }
+        }
       if (updatesToApply.clientEmail && contractData.email && contractData.email !== clientData?.email) {
         clientUpdate.email = contractData.email;
       }
@@ -212,14 +212,14 @@ export function UpdateClientDialog({
         clientUpdate.phone = contractData.telefone;
       }
 
-      if (Object.keys(clientUpdate).length > 0) {
-        const response = await fetch(`/api/scu/clients/${clientId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(clientUpdate),
-        });
+        if (Object.keys(clientUpdate).length > 0) {
+          const response = await fetch(`/api/scu/clients/${clientId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(clientUpdate),
+          });
 
-        if (response.ok) {
+          if (response.ok) {
           const updatedFields = Object.keys(clientUpdate).map(key => {
             if (key === 'full_name') return 'Nome';
             if (key === 'cpf') return 'CPF';
@@ -228,8 +228,8 @@ export function UpdateClientDialog({
             return key;
           });
           updates.push(`Cliente atualizado: ${updatedFields.join(', ')}`);
-        } else {
-          throw new Error("Erro ao atualizar cliente");
+          } else {
+            throw new Error("Erro ao atualizar cliente");
         }
       }
 
@@ -247,7 +247,7 @@ export function UpdateClientDialog({
         // Verificar se já existe um caso (pode vir como cases ou Case)
         const cases = clientData?.cases || clientData?.Case || [];
         const allCases = Array.isArray(cases) ? cases : [];
-        
+
         if (updatesToApply.case && allCases.length > 0) {
           // Encontrar o caso mais similar (mesmo produto) ou usar o primeiro
           const similarCase = allCases.find((c: any) => 
@@ -258,7 +258,7 @@ export function UpdateClientDialog({
           const caseUpdate: any = {
             product: product,
             installments_total: contractData.quantidade_parcelas || null,
-            installments_value: contractData.valor_parcela ? String(contractData.valor_parcela) : null,
+            installment_value: contractData.valor_parcela ? String(contractData.valor_parcela) : null,
             debt_amount: contractData.valor_divida ? String(contractData.valor_divida) : null,
           };
 
@@ -275,12 +275,15 @@ export function UpdateClientDialog({
           }
         } else if (updatesToApply.createCase) {
           // Criar novo caso
+          const bankName = contractData.banco_credor && contractData.banco_credor.trim() 
+            ? contractData.banco_credor.trim() 
+            : "Não informado";
           const caseData = {
             clientId: clientId,
             product: product,
-            bank_name: "Não informado",
+            bank_name: bankName,
             installments_total: contractData.quantidade_parcelas || null,
-            installments_value: contractData.valor_parcela ? String(contractData.valor_parcela) : null,
+            installment_value: contractData.valor_parcela ? String(contractData.valor_parcela) : null,
             debt_amount: contractData.valor_divida ? String(contractData.valor_divida) : null,
             paid_installments: null,
             paid_debt_amount: null,
@@ -590,9 +593,9 @@ export function UpdateClientDialog({
                 <div className="flex items-center gap-2">
                   <div className="w-1 h-8 bg-[#1e3a8a] rounded-full"></div>
                   <h3 className="font-bold text-xl text-[#1e3a8a]">
-                    Comparação: Dados do Caso/Produto
-                  </h3>
-                </div>
+                  Comparação: Dados do Caso/Produto
+                </h3>
+                    </div>
 
                 {(() => {
                   const cases = clientData?.cases || clientData?.Case || [];
@@ -620,8 +623,8 @@ export function UpdateClientDialog({
                   
                   const allCases = Array.isArray(cases) ? cases.map(normalizeCaseForDisplay) : [];
                   const contractProduct = mapTipoContratoToProduct(
-                    contractData.tipo_contrato,
-                    !!(contractData.veiculo_marca || contractData.veiculo_modelo || contractData.veiculo_ano)
+                              contractData.tipo_contrato,
+                              !!(contractData.veiculo_marca || contractData.veiculo_modelo || contractData.veiculo_ano)
                   );
 
                   return (
@@ -636,34 +639,34 @@ export function UpdateClientDialog({
                           <div className="bg-white/60 rounded-lg p-3">
                             <span className="text-xs font-medium text-[#64748b] block mb-1">Produto:</span>
                             <p className="font-semibold text-[#1e293b]">{contractProduct}</p>
-                          </div>
+                        </div>
                           <div className="bg-white/60 rounded-lg p-3">
                             <span className="text-xs font-medium text-[#64748b] block mb-1">Parcelas:</span>
                             <p className="font-semibold text-[#1e293b]">{contractData.quantidade_parcelas || "N/A"}</p>
-                          </div>
+                        </div>
                           <div className="bg-white/60 rounded-lg p-3">
                             <span className="text-xs font-medium text-[#64748b] block mb-1">Valor Parcela:</span>
                             <p className="font-semibold text-[#1e293b]">
-                              {contractData.valor_parcela
-                                ? new Intl.NumberFormat("pt-BR", {
-                                    style: "currency",
-                                    currency: "BRL",
-                                  }).format(contractData.valor_parcela)
-                                : "N/A"}
-                            </p>
-                          </div>
+                            {contractData.valor_parcela
+                              ? new Intl.NumberFormat("pt-BR", {
+                                  style: "currency",
+                                  currency: "BRL",
+                                }).format(contractData.valor_parcela)
+                              : "N/A"}
+                          </p>
+                        </div>
                           <div className="bg-white/60 rounded-lg p-3">
                             <span className="text-xs font-medium text-[#64748b] block mb-1">Valor Dívida:</span>
                             <p className="font-semibold text-[#1e293b]">
-                              {contractData.valor_divida
-                                ? new Intl.NumberFormat("pt-BR", {
-                                    style: "currency",
-                                    currency: "BRL",
-                                  }).format(contractData.valor_divida)
-                                : "N/A"}
-                            </p>
-                          </div>
+                            {contractData.valor_divida
+                              ? new Intl.NumberFormat("pt-BR", {
+                                  style: "currency",
+                                  currency: "BRL",
+                                }).format(contractData.valor_divida)
+                              : "N/A"}
+                          </p>
                         </div>
+                      </div>
                       </div>
 
                       {/* Casos Existentes no SCU */}
@@ -673,17 +676,32 @@ export function UpdateClientDialog({
                             Casos Existentes no SCU ({allCases.length})
                           </h4>
                           {(showAllCases ? allCases : allCases.slice(0, CASES_PER_PAGE)).map((existingCase: any, index: number) => {
-                            const contractBank = (contractData.banco || contractData.banco_credor || "").trim();
+                            const contractBank = (contractData.banco_credor || "").trim();
                             const isSimilarProduct = existingCase.product?.toLowerCase() === contractProduct.toLowerCase();
                             
-                            // Se o contrato tem banco, compara banco também. Se não tem, só compara produto
-                            const hasContractBank = contractBank && contractBank.toLowerCase() !== "não informado";
-                            const isSimilarBank = hasContractBank 
-                              ? (existingCase.bank_name && 
-                                 existingCase.bank_name.toLowerCase() !== "n/c" && 
-                                 existingCase.bank_name.toLowerCase() !== "não informado" &&
-                                 existingCase.bank_name.toLowerCase() === contractBank.toLowerCase())
-                              : true; // Se não tem banco no contrato, considera similar (só valida produto)
+                            // Lógica de comparação de banco
+                            const contractBankLower = contractBank.toLowerCase();
+                            const existingBankLower = (existingCase.bank_name || "").toLowerCase();
+                            
+                            // Normaliza valores "não informado", "n/c", vazio para comparação
+                            const normalizeBank = (bank: string) => {
+                              const normalized = bank.toLowerCase().trim();
+                              if (!normalized || normalized === "não informado" || normalized === "n/c" || normalized === "nao informado") {
+                                return "não informado";
+                              }
+                              return normalized;
+                            };
+                            
+                            const contractBankNormalized = normalizeBank(contractBank);
+                            const existingBankNormalized = normalizeBank(existingCase.bank_name || "");
+                            
+                            // Considera similar se:
+                            // 1. Ambos são "não informado" (normalizados)
+                            // 2. Ambos têm banco e são iguais (após normalização)
+                            // 3. Contrato não tem banco (vazio) - considera similar independente do banco do caso
+                            const isSimilarBank = 
+                              contractBankNormalized === "não informado" || // Contrato sem banco ou "Não informado" → sempre similar
+                              contractBankNormalized === existingBankNormalized; // Bancos iguais (após normalização)
                             
                             const canUpdate = isSimilarProduct && isSimilarBank;
                             const installmentsValueNum = parseFormattedValue(existingCase.installments_value || existingCase.installment_value);
@@ -716,14 +734,14 @@ export function UpdateClientDialog({
                                         Produto Similar
                                       </span>
                                     )}
-                                  </div>
-                                </div>
+                    </div>
+                  </div>
                                 <div className="grid md:grid-cols-4 gap-4">
                                   <div>
                                     <span className="text-xs font-medium text-[#64748b] block mb-1">Banco:</span>
                                     <p className="font-semibold text-[#1e293b]">{existingCase.bank_name || "N/A"}</p>
-                                  </div>
-                                  <div>
+                    </div>
+                      <div>
                                     <span className="text-xs font-medium text-[#64748b] block mb-1">Parcelas:</span>
                                     <p className={`font-semibold ${
                                       contractData.quantidade_parcelas !== existingCase.installments_total
@@ -733,10 +751,10 @@ export function UpdateClientDialog({
                                       {existingCase.installments_total || "N/A"}
                                       {contractData.quantidade_parcelas !== existingCase.installments_total && (
                                         <AlertCircle className="inline-block h-3 w-3 ml-1 text-orange-600" />
-                                      )}
-                                    </p>
-                                  </div>
-                                  <div>
+                          )}
+                        </p>
+                      </div>
+                      <div>
                                     <span className="text-xs font-medium text-[#64748b] block mb-1">Valor Parcela:</span>
                                     <p className={`font-semibold ${
                                       (() => {
@@ -753,8 +771,8 @@ export function UpdateClientDialog({
                                         const numValue = parseFormattedValue(value);
                                         if (numValue === null) return value; // Se não conseguir converter, retorna o valor original
                                         return new Intl.NumberFormat("pt-BR", {
-                                          style: "currency",
-                                          currency: "BRL",
+                                style: "currency",
+                                currency: "BRL",
                                         }).format(numValue);
                                       })()}
                                       {(() => {
@@ -764,9 +782,9 @@ export function UpdateClientDialog({
                                             <AlertCircle className="inline-block h-3 w-3 ml-1 text-orange-600" />
                                           );
                                       })()}
-                                    </p>
-                                  </div>
-                                  <div>
+                        </p>
+                      </div>
+                      <div>
                                     <span className="text-xs font-medium text-[#64748b] block mb-1">Valor Dívida:</span>
                                     <p className={`font-semibold ${
                                       (() => {
@@ -783,8 +801,8 @@ export function UpdateClientDialog({
                                         const numValue = parseFormattedValue(value);
                                         if (numValue === null) return value; // Se não conseguir converter, retorna o valor original
                                         return new Intl.NumberFormat("pt-BR", {
-                                          style: "currency",
-                                          currency: "BRL",
+                                style: "currency",
+                                currency: "BRL",
                                         }).format(numValue);
                                       })()}
                                       {(() => {
@@ -794,8 +812,8 @@ export function UpdateClientDialog({
                                             <AlertCircle className="inline-block h-3 w-3 ml-1 text-orange-600" />
                                           );
                                       })()}
-                                    </p>
-                                  </div>
+                      </p>
+                    </div>
                                 </div>
                                 {/* Botão Atualizar - só aparece se o produto E banco forem iguais */}
                                 {canUpdate && (
@@ -849,7 +867,7 @@ export function UpdateClientDialog({
                                           const caseUpdate: any = {
                                             product: contractProduct,
                                             installments_total: contractData.quantidade_parcelas || null,
-                                            installments_value: contractData.valor_parcela ? String(contractData.valor_parcela) : null,
+                                            installment_value: contractData.valor_parcela ? String(contractData.valor_parcela) : null,
                                             debt_amount: contractData.valor_divida ? String(contractData.valor_divida) : null,
                                           };
 
@@ -897,9 +915,9 @@ export function UpdateClientDialog({
                                         </>
                                       )}
                                     </button>
-                                  </div>
-                                )}
-                              </div>
+                  </div>
+                )}
+              </div>
                             );
                           })}
                           
@@ -916,20 +934,20 @@ export function UpdateClientDialog({
                                   <>Ver mais ({allCases.length - CASES_PER_PAGE} casos adicionais)</>
                                 )}
                               </button>
-                            </div>
+                  </div>
                           )}
-                        </div>
-                      ) : (
+                    </div>
+                ) : (
                         <div className="bg-[#fef3c7] border-2 border-[#fbbf24] rounded-xl p-6">
                           <div className="flex items-start gap-3">
                             <span className="text-2xl">⚠️</span>
-                            <div>
+                    <div>
                               <p className="font-semibold text-[#92400e] mb-1">Nenhum caso encontrado no SCU.</p>
                               <p className="text-sm text-[#78350f]">Você pode criar um novo caso com os dados do contrato.</p>
                             </div>
                           </div>
-                        </div>
-                      )}
+                    </div>
+                )}
                     </div>
                   );
                 })()}
@@ -961,13 +979,13 @@ export function UpdateClientDialog({
         {!fetching && (
           <div className="flex-shrink-0 border-t border-gray-200 bg-white px-6 py-4">
             <div className="flex items-center justify-between gap-3">
-              <button
-                onClick={onClose}
+                <button
+                  onClick={onClose}
                 className="px-3 py-1.5 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium transition-colors text-sm"
-              >
-                Cancelar
-              </button>
-              <button
+                >
+                  Cancelar
+                </button>
+                <button
                 onClick={async () => {
                   await handleUpdate({ 
                     clientName: selectedUpdates.clientName,
@@ -980,22 +998,22 @@ export function UpdateClientDialog({
                 }}
                 disabled={loading || isCreating}
                 className="px-4 py-1.5 bg-[#1e3a8a] text-white rounded-lg hover:bg-[#1e40af] font-semibold transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm"
-              >
+                >
                 {isCreating ? (
-                  <>
+                    <>
                     <Loader2 className="h-3 w-3 animate-spin" />
                     Criando...
-                  </>
-                ) : (
+                    </>
+                  ) : (
                   <>
                     <CheckCircle2 className="h-3 w-3" />
                     Criar Novo Caso
                   </>
-                )}
-              </button>
-            </div>
+                  )}
+                </button>
+              </div>
           </div>
-        )}
+          )}
       </div>
     </div>
   );

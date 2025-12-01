@@ -26,6 +26,7 @@ export function ContractResults({ results }: ContractResultsProps) {
   const [isLoadingCases, setIsLoadingCases] = useState(false);
   const [isUpdating, setIsUpdating] = useState<string | null>(null);
   const [showAllCases, setShowAllCases] = useState(false);
+  const [createdClientId, setCreatedClientId] = useState<string | null>(null);
   const CASES_PER_PAGE = 5; // Mostrar 5 casos por vez
 
   // Função para normalizar casos (garante que todos os campos estejam presentes)
@@ -53,7 +54,8 @@ export function ContractResults({ results }: ContractResultsProps) {
 
   // Usar casos existentes que já vêm da resposta do SCU
   useEffect(() => {
-    if (results.cliente_no_scu && results.cliente_scu_id) {
+    const clientId = createdClientId || results.cliente_scu_id;
+    if ((results.cliente_no_scu && results.cliente_scu_id) || createdClientId) {
       setIsLoadingCases(true);
       // Se os casos já vêm na resposta do SCU, usa eles diretamente
       if (results.existing_cases && Array.isArray(results.existing_cases)) {
@@ -64,10 +66,14 @@ export function ContractResults({ results }: ContractResultsProps) {
         // Se não vieram na resposta, busca separadamente
         const fetchExistingCases = async () => {
           try {
-            const response = await fetch(`/api/scu/cases/client/${results.cliente_scu_id}`);
+            const timestamp = Date.now();
+            const response = await fetch(`/api/scu/cases/client/${clientId}?t=${timestamp}`, {
+              cache: 'no-store'
+            });
             if (response.ok) {
               const data = await response.json();
               const cases = data.cases || [];
+              console.log(`[ContractResults] Casos carregados no useEffect: ${cases.length} casos encontrados`);
               const normalizedCases = cases.map(normalizeCase);
               setExistingCases(normalizedCases);
             }
@@ -83,7 +89,7 @@ export function ContractResults({ results }: ContractResultsProps) {
       setExistingCases([]);
       setIsLoadingCases(false);
     }
-  }, [results.cliente_no_scu, results.cliente_scu_id, results.existing_cases]);
+  }, [results.cliente_no_scu, results.cliente_scu_id, results.existing_cases, createdClientId]);
 
   // Função para mapear tipo de contrato para produto do SCU
   const mapTipoContratoToProduct = (tipoContrato: string | null | undefined, hasVehicleInfo: boolean): string => {
@@ -181,18 +187,23 @@ export function ContractResults({ results }: ContractResultsProps) {
       // 2. Criar caso
       const hasVehicleInfo = !!(results.veiculo_marca || results.veiculo_modelo || results.veiculo_ano || results.veiculo_cor || results.veiculo_placa);
       const product = mapTipoContratoToProduct(results.tipo_contrato, hasVehicleInfo);
+      const bankName = results.banco_credor && results.banco_credor.trim() 
+        ? results.banco_credor.trim() 
+        : "Não informado";
       const caseData = {
         clientId: clientId,
         product: product,
-        bank_name: "Não informado", // Pode ser extraído do contrato se disponível
+        bank_name: bankName,
         installments_total: results.quantidade_parcelas || null,
-        installments_value: results.valor_parcela ? String(results.valor_parcela) : null,
-        debt_amount: results.valor_divida ? String(results.valor_divida) : null,
+        installment_value: convertValueToString(results.valor_parcela),
+        debt_amount: convertValueToString(results.valor_divida),
         paid_installments: null,
         paid_debt_amount: null,
       };
 
       console.log("Criando caso:", caseData);
+      console.log("DEBUG - valor_parcela original:", results.valor_parcela, "tipo:", typeof results.valor_parcela);
+      console.log("DEBUG - installment_value convertido:", convertValueToString(results.valor_parcela));
       const caseResponse = await fetch("/api/scu/cases", {
         method: "POST",
         headers: {
@@ -208,17 +219,96 @@ export function ContractResults({ results }: ContractResultsProps) {
 
       const caseResult = await caseResponse.json();
       console.log("Caso criado com sucesso:", caseResult);
+      const newCaseId = caseResult.case?.id || caseResult.id;
+
+      // Se for financiamento veicular, criar FinancingInfo
+      const isVehicleFinancing = product.toLowerCase().includes("veicular") || 
+                                 product.toLowerCase().includes("financiamento") ||
+                                 hasVehicleInfo;
+
+      if (isVehicleFinancing && newCaseId) {
+        // Criar FinancingInfo mesmo que alguns campos estejam faltando (usar valores padrão)
+        const financingInfoData = {
+          clientId: clientId,
+          caseId: newCaseId,
+          license_plate: results.veiculo_placa || "N/C",
+          vehicle_color: results.veiculo_cor || "Não informado",
+          renavam: (results as any).veiculo_renavam || "N/C", // RENAVAM pode não estar no contrato
+          vehicle_model: results.veiculo_modelo || "Não informado",
+          vehicle_brand: results.veiculo_marca || "Não informado",
+          contract_owner: results.nome_cliente || "N/C",
+        };
+
+        try {
+          const financingResponse = await fetch("/api/scu/financing-info", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(financingInfoData),
+          });
+
+          if (financingResponse.ok) {
+            console.log("FinancingInfo criado com sucesso");
+          } else {
+            // Não falha se não conseguir criar FinancingInfo, apenas avisa
+            const errorData = await financingResponse.json();
+            console.warn("Erro ao criar FinancingInfo:", errorData);
+          }
+        } catch (financingError) {
+          console.warn("Erro ao criar FinancingInfo:", financingError);
+        }
+      }
 
       // Atualizar o estado para indicar que o cliente agora existe no SCU
+      setCreatedClientId(clientId);
       setCreationStatus({ 
         type: 'success', 
-        message: 'Cliente e caso criados com sucesso! Redirecionando...' 
+        message: 'Cliente e caso criados com sucesso!' 
       });
       
-      // Abrir a página do cliente no SCU em nova aba após 1.5 segundos
-      setTimeout(() => {
-        window.open(`https://cadastro-unico.grupoflex.com.br/clientes/${clientId}`, '_blank');
-      }, 1500);
+      // Aguardar um pouco para garantir que o caso foi persistido no banco
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Recarregar casos existentes (com cache-busting para garantir dados atualizados)
+      // Tentar até 3 vezes para garantir que pegamos o caso recém-criado
+      let casesLoaded = false;
+      let attempts = 0;
+      const maxAttempts = 3;
+      
+      while (!casesLoaded && attempts < maxAttempts) {
+        attempts++;
+        const timestamp = Date.now();
+        const casesResponse = await fetch(`/api/scu/cases/client/${clientId}?t=${timestamp}`, {
+          cache: 'no-store'
+        });
+        
+        if (casesResponse.ok) {
+          const data = await casesResponse.json();
+          const cases = data.cases || [];
+          console.log(`[ContractResults] Tentativa ${attempts} (após criar cliente): ${cases.length} casos encontrados`, cases);
+          
+          // Se encontrou casos, atualiza a lista
+          if (cases.length > 0) {
+            const normalizedCases = cases.map(normalizeCase);
+            setExistingCases(normalizedCases);
+            casesLoaded = true;
+          } else if (attempts < maxAttempts) {
+            // Se não encontrou casos mas ainda tem tentativas, aguarda mais um pouco
+            await new Promise(resolve => setTimeout(resolve, 500));
+          } else {
+            // Última tentativa sem casos, atualiza mesmo assim (lista vazia)
+            setExistingCases([]);
+            casesLoaded = true;
+          }
+        } else {
+          const errorData = await casesResponse.json();
+          console.error(`[ContractResults] Erro ao recarregar casos (tentativa ${attempts}):`, errorData);
+          if (attempts < maxAttempts) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+          } else {
+            casesLoaded = true; // Para evitar loop infinito
+          }
+        }
+      }
 
     } catch (error: any) {
       console.error("Erro ao criar cliente/caso:", error);
@@ -233,7 +323,8 @@ export function ContractResults({ results }: ContractResultsProps) {
 
   // Função para criar apenas o caso (quando cliente já existe)
   const handleCreateCase = async () => {
-    if (!results.cliente_scu_id) {
+    const clientId = createdClientId || results.cliente_scu_id;
+    if (!clientId) {
       setCreationStatus({ type: 'error', message: 'ID do cliente não encontrado' });
       return;
     }
@@ -244,13 +335,16 @@ export function ContractResults({ results }: ContractResultsProps) {
     try {
       const hasVehicleInfo = !!(results.veiculo_marca || results.veiculo_modelo || results.veiculo_ano || results.veiculo_cor || results.veiculo_placa);
       const product = mapTipoContratoToProduct(results.tipo_contrato, hasVehicleInfo);
+      const bankName = results.banco_credor && results.banco_credor.trim() 
+        ? results.banco_credor.trim() 
+        : "Não informado";
       const caseData = {
-        clientId: results.cliente_scu_id,
+        clientId: clientId,
         product: product,
-        bank_name: "Não informado",
+        bank_name: bankName,
         installments_total: results.quantidade_parcelas || null,
-        installments_value: results.valor_parcela ? String(results.valor_parcela) : null,
-        debt_amount: results.valor_divida ? String(results.valor_divida) : null,
+        installment_value: convertValueToString(results.valor_parcela),
+        debt_amount: convertValueToString(results.valor_divida),
         paid_installments: null,
         paid_debt_amount: null,
       };
@@ -270,24 +364,57 @@ export function ContractResults({ results }: ContractResultsProps) {
 
       const caseResult = await caseResponse.json();
       console.log("Caso criado com sucesso:", caseResult);
+      const newCaseId = caseResult.case?.id || caseResult.id;
 
-      // Recarregar casos existentes
-      const response = await fetch(`/api/scu/cases/client/${results.cliente_scu_id}`);
-      if (response.ok) {
-        const data = await response.json();
-        const cases = data.cases || [];
-        const normalizedCases = cases.map(normalizeCase);
-        setExistingCases(normalizedCases);
+      // Se for financiamento veicular, criar FinancingInfo
+      const isVehicleFinancing = product.toLowerCase().includes("veicular") || 
+                                 product.toLowerCase().includes("financiamento") ||
+                                 hasVehicleInfo;
+
+      if (isVehicleFinancing && newCaseId) {
+        // Criar FinancingInfo mesmo que alguns campos estejam faltando (usar valores padrão)
+        const financingInfoData = {
+          clientId: clientId,
+          caseId: newCaseId,
+          license_plate: results.veiculo_placa || "N/C",
+          vehicle_color: results.veiculo_cor || "Não informado",
+          renavam: (results as any).veiculo_renavam || "N/C", // RENAVAM pode não estar no contrato
+          vehicle_model: results.veiculo_modelo || "Não informado",
+          vehicle_brand: results.veiculo_marca || "Não informado",
+          contract_owner: results.nome_cliente || "N/C",
+        };
+
+        try {
+          const financingResponse = await fetch("/api/scu/financing-info", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(financingInfoData),
+          });
+
+          if (financingResponse.ok) {
+            console.log("FinancingInfo criado com sucesso");
+          } else {
+            // Não falha se não conseguir criar FinancingInfo, apenas avisa
+            const errorData = await financingResponse.json();
+            console.warn("Erro ao criar FinancingInfo:", errorData);
+          }
+        } catch (financingError) {
+          console.warn("Erro ao criar FinancingInfo:", financingError);
+        }
+      }
+
+      // Adicionar o caso recém-criado à lista existente (sem fazer GET)
+      const newCase = caseResult.case || caseResult;
+      if (newCase) {
+        const normalizedNewCase = normalizeCase(newCase);
+        console.log(`[ContractResults] Adicionando novo caso à lista:`, normalizedNewCase);
+        setExistingCases(prevCases => [...prevCases, normalizedNewCase]);
       }
 
       setCreationStatus({ 
         type: 'success', 
         message: 'Caso criado com sucesso!' 
       });
-      
-      setTimeout(() => {
-        window.open(`https://cadastro-unico.grupoflex.com.br/clientes/${results.cliente_scu_id}`, '_blank');
-      }, 1500);
 
     } catch (error: any) {
       console.error("Erro ao criar caso:", error);
@@ -302,18 +429,22 @@ export function ContractResults({ results }: ContractResultsProps) {
 
   // Função para atualizar um caso existente
   const handleUpdateCase = async (caseId: string) => {
+    const clientId = createdClientId || results.cliente_scu_id;
     setIsUpdating(caseId);
     setCreationStatus({ type: null, message: '' });
 
     try {
       const hasVehicleInfo = !!(results.veiculo_marca || results.veiculo_modelo || results.veiculo_ano || results.veiculo_cor || results.veiculo_placa);
       const product = mapTipoContratoToProduct(results.tipo_contrato, hasVehicleInfo);
+      const bankName = results.banco_credor && results.banco_credor.trim() 
+        ? results.banco_credor.trim() 
+        : "Não informado";
       const updateData = {
         product: product,
-        bank_name: "Não informado",
+        bank_name: bankName,
         installments_total: results.quantidade_parcelas || null,
-        installments_value: results.valor_parcela ? String(results.valor_parcela) : null,
-        debt_amount: results.valor_divida ? String(results.valor_divida) : null,
+        installment_value: convertValueToString(results.valor_parcela),
+        debt_amount: convertValueToString(results.valor_divida),
       };
 
       const response = await fetch(`/api/scu/cases/${caseId}`, {
@@ -332,23 +463,30 @@ export function ContractResults({ results }: ContractResultsProps) {
       const caseResult = await response.json();
       console.log("Caso atualizado com sucesso:", caseResult);
 
-      // Recarregar casos existentes para mostrar dados atualizados
-      const casesResponse = await fetch(`/api/scu/cases/client/${results.cliente_scu_id}`);
-      if (casesResponse.ok) {
-        const data = await casesResponse.json();
-        const cases = data.cases || [];
-        const normalizedCases = cases.map(normalizeCase);
-        setExistingCases(normalizedCases);
+      // Aguardar um pouco para garantir que o caso foi atualizado no banco
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Recarregar casos existentes para mostrar dados atualizados (com cache-busting)
+      if (clientId) {
+        const timestamp = Date.now();
+        const casesResponse = await fetch(`/api/scu/cases/client/${clientId}?t=${timestamp}`, {
+          cache: 'no-store'
+        });
+        if (casesResponse.ok) {
+          const data = await casesResponse.json();
+          const cases = data.cases || [];
+          console.log(`[ContractResults] Casos recarregados após atualizar: ${cases.length} casos encontrados`, cases);
+          const normalizedCases = cases.map(normalizeCase);
+          setExistingCases(normalizedCases);
+        } else {
+          console.error("Erro ao recarregar casos:", await casesResponse.json());
+        }
       }
 
       setCreationStatus({ 
         type: 'success', 
         message: 'Caso atualizado com sucesso!' 
       });
-      
-      setTimeout(() => {
-        window.open(`https://cadastro-unico.grupoflex.com.br/clientes/${results.cliente_scu_id}`, '_blank');
-      }, 1500);
 
     } catch (error: any) {
       console.error("Erro ao atualizar caso:", error);
@@ -381,6 +519,34 @@ export function ContractResults({ results }: ContractResultsProps) {
     
     const parsed = parseFloat(cleaned);
     return isNaN(parsed) ? null : parsed;
+  };
+
+  // Função para converter valor para string (trata número, string formatada, ou null)
+  const convertValueToString = (value: number | string | null | undefined): string | null => {
+    if (value === null || value === undefined) return null;
+    
+    // Se já é número, converte para string (aceita 0 também)
+    if (typeof value === 'number') {
+      return !isNaN(value) ? String(value) : null;
+    }
+    
+    // Se é string, tenta converter para número primeiro
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (!trimmed) return null;
+      
+      // Se a string já é um número válido (ex: "816.50"), converte diretamente
+      const directNum = parseFloat(trimmed);
+      if (!isNaN(directNum)) {
+        return String(directNum);
+      }
+      
+      // Se não, tenta usar parseFormattedValue para formatos brasileiros
+      const numValue = parseFormattedValue(trimmed);
+      return numValue !== null && !isNaN(numValue) ? String(numValue) : null;
+    }
+    
+    return null;
   };
 
   const formatCurrency = (value: number | null | undefined | string) => {
@@ -635,62 +801,68 @@ export function ContractResults({ results }: ContractResultsProps) {
         {/* Seção superior: Dados principais em grid assimétrico */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Card grande - Dados do Cliente */}
-          <div className="lg:col-span-2 relative overflow-hidden bg-white rounded-2xl p-8 shadow-xl border-2 border-[#cbd5e1]">
+          <div className="lg:col-span-2 relative overflow-hidden bg-white rounded-2xl p-6 shadow-xl border-2 border-[#cbd5e1]">
             <div className="absolute top-0 right-0 w-32 h-32 bg-[#1e3a8a]/5 rounded-full -mr-16 -mt-16"></div>
             <div className="relative">
-              <div className="flex items-center gap-2 mb-6">
-                <div className="w-1 h-8 bg-[#1e3a8a] rounded-full"></div>
-                <h3 className="text-lg font-bold text-[#1e3a8a]">Dados do Cliente</h3>
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-1 h-6 bg-[#1e3a8a] rounded-full"></div>
+                <h3 className="text-base font-bold text-[#1e3a8a]">Dados do Cliente</h3>
               </div>
-              <div className="space-y-6">
+              <div className="space-y-4">
                 {/* Informações do Cliente */}
-                <div className="grid sm:grid-cols-2 gap-6">
-                  <div className="space-y-1">
-                    <span className="text-xs font-medium text-[#64748b] uppercase tracking-wide">Nome Completo</span>
-                    <p className="text-lg font-semibold text-[#1e293b]">{results.nome_cliente || "Não informado"}</p>
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div className="space-y-1 min-w-0">
+                    <span className="text-xs font-medium text-[#64748b] uppercase tracking-wide block">Nome Completo</span>
+                    <p className="text-sm font-semibold text-[#1e293b] truncate" title={results.nome_cliente || "Não informado"}>
+                      {results.nome_cliente || "Não informado"}
+                    </p>
                   </div>
                   {results.cpf_cnpj && (
-                    <div className="space-y-1">
-                      <span className="text-xs font-medium text-[#64748b] uppercase tracking-wide">CPF/CNPJ</span>
-                      <p className="text-lg font-semibold text-[#1e293b]">{results.cpf_cnpj}</p>
+                    <div className="space-y-1 min-w-0">
+                      <span className="text-xs font-medium text-[#64748b] uppercase tracking-wide block">CPF/CNPJ</span>
+                      <p className="text-sm font-semibold text-[#1e293b] truncate" title={results.cpf_cnpj}>
+                        {results.cpf_cnpj}
+                      </p>
                     </div>
                   )}
                   {/* Data de Nascimento, Email e Telefone - do SCU se disponível */}
                   {results.cliente_no_scu && results.cliente_scu_data && (
                     <>
                       {results.cliente_scu_data.birth_date && (
-                        <div className="space-y-1">
+                        <div className="space-y-1 min-w-0">
                           <span className="text-xs font-medium text-[#64748b] uppercase tracking-wide flex items-center gap-1">
-                            <Calendar className="h-3 w-3" />
+                            <Calendar className="h-3 w-3 flex-shrink-0" />
                             Data de Nascimento
                           </span>
-                          <p className="text-lg font-semibold text-[#1e293b]">
+                          <p className="text-sm font-semibold text-[#1e293b]">
                             {new Date(results.cliente_scu_data.birth_date).toLocaleDateString('pt-BR')}
                           </p>
                         </div>
                       )}
                       {results.cliente_scu_data.email && (
-                        <div className="space-y-1">
+                        <div className="space-y-1 min-w-0">
                           <span className="text-xs font-medium text-[#64748b] uppercase tracking-wide flex items-center gap-1">
-                            <Mail className="h-3 w-3" />
+                            <Mail className="h-3 w-3 flex-shrink-0" />
                             Email
                           </span>
-                          <p className="text-lg font-semibold text-[#1e293b]">{results.cliente_scu_data.email}</p>
+                          <p className="text-sm font-semibold text-[#1e293b] truncate break-all" title={results.cliente_scu_data.email}>
+                            {results.cliente_scu_data.email}
+                          </p>
                         </div>
                       )}
                       {results.cliente_scu_data.phone && (
-                        <div className="space-y-1">
+                        <div className="space-y-1 min-w-0">
                           <span className="text-xs font-medium text-[#64748b] uppercase tracking-wide flex items-center gap-1">
-                            <Phone className="h-3 w-3" />
+                            <Phone className="h-3 w-3 flex-shrink-0" />
                             Telefone
                           </span>
                           <div className="flex items-center gap-2 flex-wrap">
-                            <p className="text-lg font-semibold text-[#1e293b]">{results.cliente_scu_data.phone}</p>
+                            <p className="text-sm font-semibold text-[#1e293b]">{results.cliente_scu_data.phone}</p>
                             <a
                               href={`https://wa.me/55${results.cliente_scu_data.phone.replace(/\D/g, '')}`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 px-2 py-1 bg-[#25D366] hover:bg-[#20BA5A] text-white text-xs font-semibold rounded-lg transition-all duration-200 shadow-sm hover:shadow-md"
+                              className="inline-flex items-center gap-1 px-2 py-1 bg-[#25D366] hover:bg-[#20BA5A] text-white text-xs font-semibold rounded-lg transition-all duration-200 shadow-sm hover:shadow-md flex-shrink-0"
                             >
                               <MessageCircle className="h-3 w-3" />
                               WhatsApp
@@ -701,45 +873,52 @@ export function ContractResults({ results }: ContractResultsProps) {
                     </>
                   )}
                   {results.numero_contrato && (
-                    <div className="space-y-1">
-                      <span className="text-xs font-medium text-[#64748b] uppercase tracking-wide">Nº Contrato</span>
-                      <p className="text-lg font-semibold text-[#1e293b]">{results.numero_contrato}</p>
+                    <div className="space-y-1 min-w-0">
+                      <span className="text-xs font-medium text-[#64748b] uppercase tracking-wide block">Nº Contrato</span>
+                      <p className="text-sm font-semibold text-[#1e293b] truncate" title={results.numero_contrato}>
+                        {results.numero_contrato}
+                      </p>
                     </div>
                   )}
                   {results.tipo_contrato && (
-                    <div className="space-y-1">
-                      <span className="text-xs font-medium text-[#64748b] uppercase tracking-wide">Tipo</span>
-                      <p className="text-lg font-semibold text-[#1e293b]">{results.tipo_contrato}</p>
+                    <div className="space-y-1 min-w-0">
+                      <span className="text-xs font-medium text-[#64748b] uppercase tracking-wide block">Tipo</span>
+                      <p className="text-sm font-semibold text-[#1e293b] truncate" title={results.tipo_contrato}>
+                        {results.tipo_contrato}
+                      </p>
                     </div>
                   )}
                 </div>
 
                 {/* Status e Botões - Embaixo das informações */}
-                {results.cliente_no_scu !== undefined && results.cliente_no_scu !== null && (
-                  <div className="pt-4 border-t border-[#cbd5e1]">
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                      {results.cliente_no_scu ? (
+                {((results.cliente_no_scu !== undefined && results.cliente_no_scu !== null) || createdClientId) ? (
+                  <div className="pt-3 border-t border-[#cbd5e1]">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                      {(results.cliente_no_scu || createdClientId) ? (
                         <>
                           <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#10b981]/10 text-[#10b981] text-xs font-semibold rounded-lg border border-[#10b981]/20">
                             <span className="w-2 h-2 bg-[#10b981] rounded-full"></span>
                             Cliente cadastrado no SCU
                           </span>
-                          {results.cliente_scu_id && (
+                          {(results.cliente_scu_id || createdClientId) && (
                             <div className="flex gap-2 flex-wrap">
                               <button
                                 onClick={() => {
-                                  window.open(`https://cadastro-unico.grupoflex.com.br/clientes/${results.cliente_scu_id}`, '_blank');
+                                  const clientId = createdClientId || results.cliente_scu_id;
+                                  window.open(`https://cadastro-unico.grupoflex.com.br/clientes/${clientId}`, '_blank');
                                 }}
-                                className="inline-flex items-center gap-2 px-4 py-2 bg-[#10b981] hover:bg-[#059669] text-white text-sm font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#10b981] hover:bg-[#059669] text-white text-xs font-semibold rounded-lg transition-all duration-200 shadow-sm hover:shadow-md"
                               >
                                 Ver Cliente no SCU
                               </button>
-                              <button
-                                onClick={() => setIsUpdateDialogOpen(true)}
-                                className="inline-flex items-center gap-2 px-4 py-2 bg-[#1e3a8a] hover:bg-[#1e40af] text-white text-sm font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
-                              >
-                                Atualizar Dados
-                              </button>
+                              {(createdClientId || results.cliente_scu_id) && (
+                                <button
+                                  onClick={() => setIsUpdateDialogOpen(true)}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#1e3a8a] hover:bg-[#1e40af] text-white text-xs font-semibold rounded-lg transition-all duration-200 shadow-sm hover:shadow-md"
+                                >
+                                  Atualizar Dados
+                                </button>
+                              )}
                             </div>
                           )}
                         </>
@@ -766,7 +945,7 @@ export function ContractResults({ results }: ContractResultsProps) {
                         </>
                       )}
                     </div>
-                    {!results.cliente_no_scu && creationStatus.type && (
+                    {creationStatus.type && (
                       <div className={`mt-3 px-3 py-2 rounded-lg text-xs font-medium ${
                         creationStatus.type === 'success' 
                           ? 'bg-[#10b981]/10 text-[#10b981] border border-[#10b981]/20' 
@@ -776,46 +955,55 @@ export function ContractResults({ results }: ContractResultsProps) {
                       </div>
                     )}
                   </div>
-                )}
+                ) : null}
               </div>
             </div>
           </div>
 
         </div>
 
-        {/* Cards de Valores Financeiros - Valor da Parcela, Valor Dívida e Parcelas */}
-        <div className="grid md:grid-cols-3 gap-6">
+        {/* Cards de Valores Financeiros - Valor da Parcela, Valor Dívida, Parcelas e Taxa de Juros */}
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
           {results.valor_parcela && (
-            <div className="relative overflow-hidden bg-[#00C853] rounded-2xl p-6 shadow-lg">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -mr-12 -mt-12"></div>
+            <div className="relative overflow-hidden bg-[#00C853] rounded-2xl p-5 shadow-lg">
+              <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10"></div>
               <div className="relative">
                 <span className="text-xs font-medium text-white/90 block mb-2">Valor da Parcela</span>
-                <p className="text-2xl font-bold text-white">{formatCurrency(results.valor_parcela)}</p>
+                <p className="text-xl font-bold text-white">{formatCurrency(results.valor_parcela)}</p>
               </div>
             </div>
           )}
           {results.valor_divida && (
-            <div className="relative overflow-hidden bg-[#FF6B6B] rounded-2xl p-6 shadow-lg">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -mr-12 -mt-12"></div>
+            <div className="relative overflow-hidden bg-[#FF6B6B] rounded-2xl p-5 shadow-lg">
+              <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10"></div>
               <div className="relative">
                 <span className="text-xs font-medium text-white/90 block mb-2">Valor Dívida</span>
-                <p className="text-2xl font-bold text-white">{formatCurrency(results.valor_divida)}</p>
+                <p className="text-xl font-bold text-white">{formatCurrency(results.valor_divida)}</p>
               </div>
             </div>
           )}
           {results.quantidade_parcelas && (
-            <div className="relative overflow-hidden bg-[#1e3a8a] rounded-2xl p-6 shadow-lg">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -mr-12 -mt-12"></div>
+            <div className="relative overflow-hidden bg-[#1e3a8a] rounded-2xl p-5 shadow-lg">
+              <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10"></div>
               <div className="relative">
                 <span className="text-xs font-medium text-white/90 block mb-2">Parcelas</span>
-                <p className="text-2xl font-bold text-white">{results.quantidade_parcelas}</p>
+                <p className="text-xl font-bold text-white">{results.quantidade_parcelas}</p>
+              </div>
+            </div>
+          )}
+          {results.taxa_juros && (
+            <div className="relative overflow-hidden bg-[#FF8C42] rounded-2xl p-5 shadow-lg">
+              <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10"></div>
+              <div className="relative">
+                <span className="text-xs font-medium text-white/90 block mb-2">Taxa de Juros</span>
+                <p className="text-xl font-bold text-white">{results.taxa_juros}%</p>
               </div>
             </div>
           )}
         </div>
 
         {/* Seção de Comparação: Contrato vs Casos SCU */}
-        {results.cliente_no_scu && results.cliente_scu_id && (
+        {((results.cliente_no_scu && results.cliente_scu_id) || createdClientId) && (
           <div className="relative overflow-hidden bg-white rounded-2xl p-8 shadow-xl border-2 border-[#cbd5e1]">
             <div className="absolute top-0 right-0 w-32 h-32 bg-[#1e3a8a]/5 rounded-full -mr-16 -mt-16" />
             <div className="relative">
@@ -896,20 +1084,65 @@ export function ContractResults({ results }: ContractResultsProps) {
                     {(showAllCases ? existingCases : existingCases.slice(0, CASES_PER_PAGE)).map((existingCase, index) => {
                       const hasVehicleInfo = !!(results.veiculo_marca || results.veiculo_modelo || results.veiculo_ano || results.veiculo_cor || results.veiculo_placa);
                       const contractProduct = mapTipoContratoToProduct(results.tipo_contrato, hasVehicleInfo);
-                      // Banco pode vir como banco, banco_credor, ou não estar no contrato
-                      const contractBank = (results.banco || results.banco_credor || "").trim();
+                      // Banco pode vir como banco_credor ou não estar no contrato
+                      const contractBank = (results.banco_credor || "").trim();
                       const isSimilarProduct = existingCase.product.toLowerCase() === contractProduct.toLowerCase();
                       
-                      // Se o contrato tem banco, compara banco também. Se não tem, só compara produto
-                      const hasContractBank = contractBank && contractBank.toLowerCase() !== "não informado";
-                      const isSimilarBank = hasContractBank 
-                        ? (existingCase.bank_name && 
-                           existingCase.bank_name.toLowerCase() !== "n/c" && 
-                           existingCase.bank_name.toLowerCase() !== "não informado" &&
-                           existingCase.bank_name.toLowerCase() === contractBank.toLowerCase())
-                        : true; // Se não tem banco no contrato, considera similar (só valida produto)
+                      // Lógica de comparação de banco
+                      const contractBankLower = contractBank.toLowerCase();
+                      const existingBankLower = (existingCase.bank_name || "").toLowerCase();
                       
-                      const canUpdate = isSimilarProduct && isSimilarBank;
+                      // Normaliza valores "não informado", "n/c", vazio para comparação
+                      const normalizeBank = (bank: string) => {
+                        const normalized = bank.toLowerCase().trim();
+                        if (!normalized || normalized === "não informado" || normalized === "n/c" || normalized === "nao informado") {
+                          return "não informado";
+                        }
+                        return normalized;
+                      };
+                      
+                      const contractBankNormalized = normalizeBank(contractBank);
+                      const existingBankNormalized = normalizeBank(existingCase.bank_name || "");
+                      
+                      // Considera similar se:
+                      // 1. Ambos são "não informado" (normalizados)
+                      // 2. Ambos têm banco e são iguais (após normalização)
+                      // 3. Contrato não tem banco (vazio) - considera similar independente do banco do caso
+                      const isSimilarBank = 
+                        contractBankNormalized === "não informado" || // Contrato sem banco ou "Não informado" → sempre similar
+                        contractBankNormalized === existingBankNormalized; // Bancos iguais (após normalização)
+                      
+                      // Função auxiliar para normalizar valores numéricos para comparação
+                      const normalizeNumericValue = (value: any): number | null => {
+                        if (value === null || value === undefined) return null;
+                        const str = String(value).replace(/[^\d,.-]/g, '').replace(',', '.');
+                        const num = parseFloat(str);
+                        return isNaN(num) ? null : num;
+                      };
+                      
+                      // Comparar parcelas
+                      const contractInstallments = results.quantidade_parcelas || null;
+                      const existingInstallments = existingCase.installments_total || null;
+                      const isSameInstallments = contractInstallments === existingInstallments;
+                      
+                      // Comparar valor da parcela (converter para número para comparação precisa)
+                      const contractInstallmentValueNum = normalizeNumericValue(results.valor_parcela);
+                      const existingInstallmentValueNum = normalizeNumericValue(existingCase.installment_value);
+                      // Considera igual se ambos são null ou se ambos têm o mesmo valor numérico
+                      const isSameInstallmentValue = (contractInstallmentValueNum === null && existingInstallmentValueNum === null) ||
+                                                    (contractInstallmentValueNum !== null && existingInstallmentValueNum !== null && 
+                                                     Math.abs(contractInstallmentValueNum - existingInstallmentValueNum) < 0.01); // Tolerância de 1 centavo
+                      
+                      // Comparar valor da dívida (converter para número para comparação precisa)
+                      const contractDebtAmountNum = normalizeNumericValue(results.valor_divida);
+                      const existingDebtAmountNum = normalizeNumericValue(existingCase.debt_amount);
+                      // Considera igual se ambos são null ou se ambos têm o mesmo valor numérico
+                      const isSameDebtAmount = (contractDebtAmountNum === null && existingDebtAmountNum === null) ||
+                                              (contractDebtAmountNum !== null && existingDebtAmountNum !== null && 
+                                               Math.abs(contractDebtAmountNum - existingDebtAmountNum) < 0.01); // Tolerância de 1 centavo
+                      
+                      // Só pode atualizar se TODOS os dados forem idênticos
+                      const canUpdate = isSimilarProduct && isSimilarBank && isSameInstallments && isSameInstallmentValue && isSameDebtAmount;
                       
                       return (
                         <div 
@@ -1066,16 +1299,6 @@ export function ContractResults({ results }: ContractResultsProps) {
           </div>
         )}
 
-        {/* Taxa de Juros */}
-        {results.taxa_juros && (
-          <div className="relative overflow-hidden bg-[#FF8C42] rounded-2xl p-6 shadow-lg">
-            <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -mr-12 -mt-12"></div>
-            <div className="relative">
-              <span className="text-xs font-medium text-white/90 block mb-2">Taxa de Juros</span>
-              <p className="text-2xl font-bold text-white">{results.taxa_juros}%</p>
-            </div>
-          </div>
-        )}
 
         {/* Datas em formato timeline */}
         {(results.data_vencimento_primeira || results.data_vencimento_ultima) && (
@@ -1128,11 +1351,11 @@ export function ContractResults({ results }: ContractResultsProps) {
       </div>
 
       {/* Dialog de Atualização */}
-      {results.cliente_scu_id && (
+      {(results.cliente_scu_id || createdClientId) && (
         <UpdateClientDialog
           isOpen={isUpdateDialogOpen}
           onClose={() => setIsUpdateDialogOpen(false)}
-          clientId={results.cliente_scu_id}
+          clientId={createdClientId || results.cliente_scu_id}
           contractData={results}
         />
       )}

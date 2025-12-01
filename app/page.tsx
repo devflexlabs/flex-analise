@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { ContractUpload } from "@/components/ContractUpload";
@@ -10,9 +10,23 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Limpa o sessionStorage quando a página carrega
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      sessionStorage.removeItem('contractResults');
+      console.log("🧹 SessionStorage limpo ao carregar página inicial");
+    }
+  }, []);
+
   const handleUpload = async (file: File) => {
     setLoading(true);
     setError(null);
+
+    // Limpa o sessionStorage antes de processar novo arquivo
+    if (typeof window !== "undefined") {
+      sessionStorage.removeItem('contractResults');
+      console.log("🧹 SessionStorage limpo antes de processar novo contrato");
+    }
 
     try {
       const formData = new FormData();
@@ -38,9 +52,13 @@ export default function Home() {
       const data = await response.json();
       console.log("Dados recebidos:", data);
 
-      // Sempre usa sessionStorage para evitar problemas com URL muito longa
-      const jsonString = JSON.stringify(data);
-      sessionStorage.setItem('contractResults', jsonString);
+      // Limpa dados antigos e salva novos dados no sessionStorage
+      if (typeof window !== "undefined") {
+        sessionStorage.removeItem('contractResults'); // Garante limpeza antes de salvar
+        const jsonString = JSON.stringify(data);
+        sessionStorage.setItem('contractResults', jsonString);
+        console.log("💾 Novos dados salvos no sessionStorage");
+      }
       
       // Mostra toast de sucesso
       toast.success("Contrato processado com sucesso!", {

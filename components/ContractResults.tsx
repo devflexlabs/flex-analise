@@ -1329,6 +1329,96 @@ export function ContractResults({ results }: ContractResultsProps) {
           </div>
         )}
 
+        {/* Recálculo com BACEN */}
+        {results.recalculo_bacen && results.recalculo_bacen.sucesso && (
+          <div className="relative overflow-hidden bg-white rounded-2xl p-8 shadow-lg border-2 border-[#cbd5e1]">
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#1e3a8a] via-[#3b82f6] to-[#1e3a8a]"></div>
+            <div className="mt-2">
+              <div className="flex items-center gap-2 mb-6">
+                <div className="w-1 h-8 bg-[#1e3a8a] rounded-full"></div>
+                <h3 className="text-lg font-bold text-[#1e3a8a]">Recálculo com Dados do BACEN</h3>
+              </div>
+              
+              {results.recalculo_bacen.metodologia_detectada && (
+                <div className="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <p className="text-sm font-medium text-blue-900">
+                    Metodologia detectada: <span className="font-bold uppercase">{results.recalculo_bacen.metodologia_detectada}</span>
+                  </p>
+                </div>
+              )}
+
+              {results.recalculo_bacen.aviso_taxa_posfixada && (
+                <div className="mb-4 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                  <p className="text-sm text-yellow-900">{results.recalculo_bacen.aviso_taxa_posfixada}</p>
+                </div>
+              )}
+
+              {results.recalculo_bacen.comparacao && (
+                <div className="space-y-4">
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="p-4 bg-gray-50 rounded-lg">
+                      <p className="text-xs font-medium text-gray-600 mb-1">Valor Parcela (Contrato)</p>
+                      <p className="text-lg font-bold text-gray-900">
+                        {results.recalculo_bacen.comparacao.valor_parcela_contrato 
+                          ? `R$ ${parseFloat(results.recalculo_bacen.comparacao.valor_parcela_contrato).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                          : 'N/A'}
+                      </p>
+                    </div>
+                    <div className="p-4 bg-blue-50 rounded-lg">
+                      <p className="text-xs font-medium text-blue-600 mb-1">Valor Parcela (Price)</p>
+                      <p className="text-lg font-bold text-blue-900">
+                        R$ {results.recalculo_bacen.comparacao.valor_parcela_price?.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || 'N/A'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {results.recalculo_bacen.comparacao.diferenca_price && results.recalculo_bacen.comparacao.diferenca_price > 1.0 && (
+                    <div className="p-4 bg-red-50 rounded-lg border border-red-200">
+                      <p className="text-sm font-medium text-red-900 mb-1">⚠️ Divergência Detectada</p>
+                      <p className="text-sm text-red-800">
+                        Diferença entre valor do contrato e cálculo Price: R$ {results.recalculo_bacen.comparacao.diferenca_price.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="grid md:grid-cols-2 gap-4 mt-4">
+                    <div className="p-4 bg-gray-50 rounded-lg">
+                      <p className="text-xs font-medium text-gray-600 mb-1">Total a Pagar (Price)</p>
+                      <p className="text-lg font-bold text-gray-900">
+                        R$ {results.recalculo_bacen.comparacao.total_pago_price?.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || 'N/A'}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Total de juros: R$ {results.recalculo_bacen.comparacao.total_juros_price?.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || 'N/A'}
+                      </p>
+                    </div>
+                    <div className="p-4 bg-gray-50 rounded-lg">
+                      <p className="text-xs font-medium text-gray-600 mb-1">Total a Pagar (SAC)</p>
+                      <p className="text-lg font-bold text-gray-900">
+                        R$ {results.recalculo_bacen.comparacao.total_pago_sac?.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || 'N/A'}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Total de juros: R$ {results.recalculo_bacen.comparacao.total_juros_sac?.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || 'N/A'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {results.recalculo_bacen.taxa_bacen && (
+                <div className="mt-4 p-4 bg-green-50 rounded-lg border border-green-200">
+                  <p className="text-xs font-medium text-green-900 mb-1">Taxa do BACEN Utilizada</p>
+                  <p className="text-sm text-green-800">
+                    Selic: {results.recalculo_bacen.taxa_bacen.toFixed(2)}% a.a. 
+                    {results.recalculo_bacen.taxa_bacen_mensal && (
+                      <span> ({results.recalculo_bacen.taxa_bacen_mensal.toFixed(4)}% a.m.)</span>
+                    )}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Observações em formato de artigo */}
         {results.observacoes && (
           <div className="relative overflow-hidden bg-white rounded-2xl p-8 shadow-lg border-2 border-[#cbd5e1]">

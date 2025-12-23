@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
+import { BarChart3 } from "lucide-react";
 import { ContractUpload } from "@/components/ContractUpload";
 
 export default function Home() {
@@ -114,7 +115,8 @@ export default function Home() {
             href="/relatorios"
             className="inline-flex items-center gap-2 px-6 py-3 bg-[#1e3a8a] text-white rounded-lg hover:bg-[#1e40af] transition-colors font-medium"
           >
-            📊 Ver Relatórios e Estatísticas
+            <BarChart3 className="h-5 w-5" />
+            Ver Relatórios e Estatísticas
           </a>
         </div>
 

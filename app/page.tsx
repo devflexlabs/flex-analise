@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
-import { BarChart3 } from "lucide-react";
+import { BarChart3, FileText } from "lucide-react";
 import { ContractUpload } from "@/components/ContractUpload";
 
 export default function Home() {
@@ -109,14 +109,21 @@ export default function Home() {
           <ContractUpload onUpload={handleUpload} loading={loading} />
         </div>
 
-        {/* Link para Relatórios */}
-        <div className="text-center mb-8">
+        {/* Links para Relatórios e Contratos */}
+        <div className="text-center mb-8 flex flex-col sm:flex-row gap-4 justify-center">
           <a
             href="/relatorios"
             className="inline-flex items-center gap-2 px-6 py-3 bg-[#1e3a8a] text-white rounded-lg hover:bg-[#1e40af] transition-colors font-medium"
           >
             <BarChart3 className="h-5 w-5" />
             Ver Relatórios e Estatísticas
+          </a>
+          <a
+            href="/contratos"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-[#059669] text-white rounded-lg hover:bg-[#047857] transition-colors font-medium"
+          >
+            <FileText className="h-5 w-5" />
+            Ver Contratos no Banco
           </a>
         </div>
 

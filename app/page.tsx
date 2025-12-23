@@ -60,10 +60,16 @@ export default function Home() {
         console.log("💾 Novos dados salvos no sessionStorage");
       }
       
-      // Mostra toast de sucesso
-      toast.success("Contrato processado com sucesso!", {
-        duration: 2000,
-      });
+      // Mostra toast de sucesso ou aviso se já existia
+      if (data.ja_existia) {
+        toast.success("Contrato processado! (Este contrato já estava no banco de dados)", {
+          duration: 3000,
+        });
+      } else {
+        toast.success("Contrato processado com sucesso!", {
+          duration: 2000,
+        });
+      }
       
       console.log("Redirecionando para /resultados");
       

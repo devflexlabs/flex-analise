@@ -6,7 +6,11 @@ import { NextRequest, NextResponse } from "next/server";
  * ou através deste proxy para evitar problemas de CORS.
  */
 
-const PYTHON_API_URL = process.env.PYTHON_API_URL || "http://localhost:8000";
+// URL da API Python - usa Railway em produção, localhost em desenvolvimento
+const PYTHON_API_URL = process.env.PYTHON_API_URL || 
+  (process.env.NODE_ENV === "production"
+    ? "https://flex-analise-backend-production.up.railway.app"
+    : "http://localhost:8000");
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;

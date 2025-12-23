@@ -24,9 +24,11 @@ export async function POST(request: NextRequest) {
     const pythonFormData = new FormData();
     pythonFormData.append("file", file);
 
-    // URL da API Python (ajuste conforme necessário)
+    // URL da API Python - usa Railway em produção, localhost em desenvolvimento
     const apiUrl = process.env.PYTHON_API_URL 
       ? `${process.env.PYTHON_API_URL}/api/extract`
+      : process.env.NODE_ENV === "production"
+      ? "https://flex-analise-backend-production.up.railway.app/api/extract"
       : "http://localhost:8000/api/extract";
     
     console.log("[Extract API] Chamando backend:", apiUrl);

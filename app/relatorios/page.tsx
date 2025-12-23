@@ -43,9 +43,12 @@ export default function RelatoriosPage() {
   const [ano, setAno] = useState<number>(new Date().getFullYear());
   const [mes, setMes] = useState<number>(new Date().getMonth() + 1);
 
-  // URL da API Python - padrão localhost, pode ser configurada via .env.local
+  // URL da API Python - usa Railway em produção, localhost em desenvolvimento
   // No Next.js, variáveis de ambiente públicas precisam ter prefixo NEXT_PUBLIC_
-  const apiUrl = process.env.NEXT_PUBLIC_PYTHON_API_URL || "http://localhost:8000";
+  const apiUrl = process.env.NEXT_PUBLIC_PYTHON_API_URL || 
+    (typeof window !== "undefined" && window.location.hostname !== "localhost" 
+      ? "https://flex-analise-backend-production.up.railway.app"
+      : "http://localhost:8000");
 
   useEffect(() => {
     carregarDados();
@@ -61,10 +64,19 @@ export default function RelatoriosPage() {
         ? `${apiUrl}/api/relatorios/estatisticas-banco?estado=${estadoFiltro}`
         : `${apiUrl}/api/relatorios/estatisticas-banco`;
 
+      console.log("🔍 Buscando estatísticas por banco:", urlBanco);
       const responseBanco = await fetch(urlBanco);
+      console.log("📡 Resposta da API (estatísticas banco):", responseBanco.status, responseBanco.statusText);
+      
       if (responseBanco.ok) {
         const data = await responseBanco.json();
-        setEstatisticasBanco(data);
+        console.log("📊 Estatísticas por banco recebidas:", data);
+        setEstatisticasBanco(Array.isArray(data) ? data : []);
+      } else {
+        const errorData = await responseBanco.json().catch(() => ({}));
+        console.error("❌ Erro ao buscar estatísticas por banco:", responseBanco.status, errorData);
+        setError(`Erro ${responseBanco.status}: ${errorData.detail || errorData.error || "Erro ao buscar estatísticas"}`);
+        setEstatisticasBanco([]); // Garante que é uma lista vazia
       }
 
       // Carrega mapa da dívida
@@ -72,10 +84,18 @@ export default function RelatoriosPage() {
         ? `${apiUrl}/api/relatorios/mapa-divida?ano=${ano}&mes=${mes}&estado=${estadoFiltro}`
         : `${apiUrl}/api/relatorios/mapa-divida?ano=${ano}&mes=${mes}`;
 
+      console.log("🔍 Buscando mapa da dívida:", urlMapa);
       const responseMapa = await fetch(urlMapa);
+      console.log("📡 Resposta da API (mapa dívida):", responseMapa.status, responseMapa.statusText);
+      
       if (responseMapa.ok) {
         const data = await responseMapa.json();
+        console.log("📈 Mapa da dívida recebido:", data);
         setMapaDivida(data);
+      } else {
+        const errorData = await responseMapa.json().catch(() => ({}));
+        console.error("❌ Erro ao buscar mapa da dívida:", responseMapa.status, errorData);
+        // Não define erro aqui para não sobrescrever outros erros, mas loga para debug
       }
 
       setLoading(false);
@@ -336,7 +356,12 @@ export default function RelatoriosPage() {
             Estatísticas por Banco
           </h2>
           {estatisticasBanco.length === 0 ? (
-            <p className="text-[#64748b] text-center py-8">Nenhum dado disponível ainda.</p>
+            <div className="text-center py-8">
+              <p className="text-[#64748b] mb-2">Nenhum dado disponível ainda.</p>
+              <p className="text-sm text-[#94a3b8]">
+                Faça upload de contratos para começar a gerar estatísticas.
+              </p>
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">

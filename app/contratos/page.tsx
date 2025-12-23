@@ -31,7 +31,8 @@ export default function ContratosPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [searchType, setSearchType] = useState<"nome" | "cpf">("nome");
 
-  const apiUrl = process.env.NEXT_PUBLIC_PYTHON_API_URL || "http://localhost:8000";
+  // URL da API - usa proxy do Next.js
+  const apiUrl = "/api/relatorios";
 
   useEffect(() => {
     carregarContratos();
@@ -42,10 +43,11 @@ export default function ContratosPage() {
       setLoading(true);
       setError(null);
 
-      const response = await fetch(`${apiUrl}/api/relatorios/analises?limite=1000`);
+      const response = await fetch(`${apiUrl}?tipo=analises&limite=1000`);
       
       if (!response.ok) {
-        throw new Error("Erro ao carregar contratos");
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || errorData.detail || "Erro ao carregar contratos");
       }
 
       const data = await response.json();

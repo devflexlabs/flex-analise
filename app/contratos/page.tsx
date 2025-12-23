@@ -21,6 +21,16 @@ interface Contrato {
   tem_taxa_abusiva: boolean;
   tem_cet_alto: boolean;
   tem_clausulas_abusivas: boolean;
+  // Informações do veículo
+  veiculo_marca: string | null;
+  veiculo_modelo: string | null;
+  veiculo_ano: string | null;
+  veiculo_cor: string | null;
+  veiculo_placa: string | null;
+  veiculo_renavam: string | null;
+  tem_veiculo: boolean;
+  // Observações e análise
+  observacoes: string | null;
 }
 
 export default function ContratosPage() {
@@ -124,13 +134,13 @@ export default function ContratosPage() {
       taxa_juros: contrato.taxa_juros,
       data_vencimento_primeira: null,
       data_vencimento_ultima: null,
-      veiculo_marca: null,
-      veiculo_modelo: null,
-      veiculo_ano: null,
-      veiculo_cor: null,
-      veiculo_placa: null,
-      veiculo_renavam: null,
-      observacoes: null,
+      veiculo_marca: contrato.veiculo_marca,
+      veiculo_modelo: contrato.veiculo_modelo,
+      veiculo_ano: contrato.veiculo_ano,
+      veiculo_cor: contrato.veiculo_cor,
+      veiculo_placa: contrato.veiculo_placa,
+      veiculo_renavam: contrato.veiculo_renavam,
+      observacoes: contrato.observacoes,
       recalculo_bacen: null,
       estado: contrato.estado,
       cidade: contrato.cidade,
@@ -310,6 +320,59 @@ export default function ContratosPage() {
                             </span>
                           </div>
                         </div>
+
+                        {/* Informações do Veículo */}
+                        {contrato.tem_veiculo && (
+                          <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                            <h4 className="font-semibold text-[#1e293b] mb-2">Informações do Veículo</h4>
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
+                              {contrato.veiculo_marca && (
+                                <div>
+                                  <span className="text-[#64748b]">Marca: </span>
+                                  <span className="font-medium text-[#1e293b]">{contrato.veiculo_marca}</span>
+                                </div>
+                              )}
+                              {contrato.veiculo_modelo && (
+                                <div>
+                                  <span className="text-[#64748b]">Modelo: </span>
+                                  <span className="font-medium text-[#1e293b]">{contrato.veiculo_modelo}</span>
+                                </div>
+                              )}
+                              {contrato.veiculo_ano && (
+                                <div>
+                                  <span className="text-[#64748b]">Ano: </span>
+                                  <span className="font-medium text-[#1e293b]">{contrato.veiculo_ano}</span>
+                                </div>
+                              )}
+                              {contrato.veiculo_cor && (
+                                <div>
+                                  <span className="text-[#64748b]">Cor: </span>
+                                  <span className="font-medium text-[#1e293b]">{contrato.veiculo_cor}</span>
+                                </div>
+                              )}
+                              {contrato.veiculo_placa && (
+                                <div>
+                                  <span className="text-[#64748b]">Placa: </span>
+                                  <span className="font-medium text-[#1e293b]">{contrato.veiculo_placa}</span>
+                                </div>
+                              )}
+                              {contrato.veiculo_renavam && (
+                                <div>
+                                  <span className="text-[#64748b]">RENAVAM: </span>
+                                  <span className="font-medium text-[#1e293b]">{contrato.veiculo_renavam}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Observações/Análise */}
+                        {contrato.observacoes && (
+                          <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                            <h4 className="font-semibold text-[#1e293b] mb-2">Análise Detalhada</h4>
+                            <p className="text-sm text-[#64748b] whitespace-pre-wrap">{contrato.observacoes}</p>
+                          </div>
+                        )}
 
                         <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
                           {contrato.valor_divida && (

@@ -102,6 +102,16 @@ export default function Home() {
           <ContractUpload onUpload={handleUpload} loading={loading} />
         </div>
 
+        {/* Link para Relatórios */}
+        <div className="text-center mb-8">
+          <a
+            href="/relatorios"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-[#1e3a8a] text-white rounded-lg hover:bg-[#1e40af] transition-colors font-medium"
+          >
+            📊 Ver Relatórios e Estatísticas
+          </a>
+        </div>
+
         {error && (
           <div className="mt-8 p-6 border-2 border-[#ef4444] bg-red-50 rounded-lg animate-fade-in">
             <p className="font-semibold text-lg mb-2 text-[#ef4444]">Erro</p>

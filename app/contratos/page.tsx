@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Search, FileText, Calendar, Building2, User, CreditCard } from "lucide-react";
+import { Search, FileText, Calendar, Building2, User, CreditCard, ArrowLeft } from "lucide-react";
 
 interface Contrato {
   id: number;
@@ -153,6 +153,15 @@ export default function ContratosPage() {
   return (
     <div className="min-h-screen bg-[#f1f5f9] p-6">
       <div className="max-w-7xl mx-auto">
+        {/* Botão Voltar */}
+        <button
+          onClick={() => router.push("/")}
+          className="inline-flex items-center gap-2 mb-6 px-4 py-2 text-[#1e3a8a] hover:text-[#1e40af] font-medium transition-colors hover:bg-[#1e3a8a]/5 rounded-lg"
+        >
+          <ArrowLeft className="h-5 w-5" />
+          Voltar para tela inicial
+        </button>
+
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-[#1e293b] mb-2">

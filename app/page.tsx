@@ -6,6 +6,77 @@ import toast from "react-hot-toast";
 import { BarChart3, FileText } from "lucide-react";
 import { ContractUpload } from "@/components/ContractUpload";
 
+/**
+ * Formata erros técnicos em mensagens amigáveis para o usuário
+ */
+function formatarErroAmigavel(erro: string): string {
+  if (!erro) return "Erro desconhecido ao processar o contrato";
+
+  const erroLower = erro.toLowerCase();
+
+  // Erros de modelo descontinuado
+  if (erroLower.includes("decommissioned") || erroLower.includes("model_decommissioned") || erroLower.includes("no longer supported")) {
+    return "O modelo de IA está temporariamente indisponível. Nossa equipe foi notificada e está trabalhando para resolver. Por favor, tente novamente em alguns minutos.";
+  }
+
+  // Erros de limite de tokens/rate limit
+  if (erroLower.includes("rate_limit") || erroLower.includes("429") || erroLower.includes("tokens per day") || erroLower.includes("tokens per minute") || erroLower.includes("tpm")) {
+    return "Limite de requisições atingido. Por favor, aguarde alguns minutos e tente novamente.";
+  }
+
+  // Erros de autenticação
+  if (erroLower.includes("api_key") || erroLower.includes("unauthorized") || erroLower.includes("401") || erroLower.includes("authentication")) {
+    return "Erro de autenticação com o serviço de IA. Nossa equipe foi notificada.";
+  }
+
+  // Erros de arquivo
+  if (erroLower.includes("file") && (erroLower.includes("too large") || erroLower.includes("size"))) {
+    return "O arquivo é muito grande. Por favor, use um arquivo menor ou compacte o PDF.";
+  }
+
+  if (erroLower.includes("file") && (erroLower.includes("format") || erroLower.includes("type") || erroLower.includes("invalid"))) {
+    return "Formato de arquivo não suportado. Por favor, envie um PDF ou imagem (JPG, PNG).";
+  }
+
+  // Erros de processamento
+  if (erroLower.includes("extract") || erroLower.includes("process") || erroLower.includes("ocr")) {
+    return "Erro ao processar o documento. Verifique se o arquivo está legível e tente novamente.";
+  }
+
+  // Erros de conexão
+  if (erroLower.includes("network") || erroLower.includes("connection") || erroLower.includes("timeout") || erroLower.includes("fetch")) {
+    return "Erro de conexão. Verifique sua internet e tente novamente.";
+  }
+
+  // Erros de servidor
+  if (erroLower.includes("500") || erroLower.includes("internal server error") || erroLower.includes("server error")) {
+    return "Erro interno do servidor. Nossa equipe foi notificada. Por favor, tente novamente em alguns minutos.";
+  }
+
+  // Erros de banco de dados
+  if (erroLower.includes("database") || erroLower.includes("db") || erroLower.includes("sql")) {
+    return "Erro ao salvar os dados. Por favor, tente novamente.";
+  }
+
+  // Remove códigos de erro técnicos e JSON
+  let mensagem = erro
+    .replace(/error code: \d+/gi, "")
+    .replace(/\{.*?\}/g, "")
+    .replace(/\[.*?\]/g, "")
+    .replace(/\(.*?\)/g, "")
+    .replace(/['"]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  // Se ainda tiver muito código técnico, usa mensagem genérica
+  if (mensagem.length > 200 || mensagem.includes("traceback") || mensagem.includes("exception")) {
+    return "Erro ao processar o contrato. Por favor, verifique se o arquivo está correto e tente novamente. Se o problema persistir, entre em contato com o suporte.";
+  }
+
+  // Capitaliza primeira letra
+  return mensagem.charAt(0).toUpperCase() + mensagem.slice(1);
+}
+
 export default function Home() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -42,10 +113,11 @@ export default function Home() {
         let errorMessage = "Erro ao processar contrato";
         try {
           const errorData = await response.json();
-          errorMessage = errorData.detail || errorData.error || errorMessage;
+          const rawError = errorData.detail || errorData.error || errorMessage;
+          errorMessage = formatarErroAmigavel(rawError);
         } catch (e) {
           // Se não conseguir parsear o JSON de erro, usa mensagem padrão
-          errorMessage = `Erro ${response.status}: ${response.statusText || "Erro ao comunicar com a API"}`;
+          errorMessage = formatarErroAmigavel(`Erro ${response.status}: ${response.statusText || "Erro ao comunicar com a API"}`);
         }
         throw new Error(errorMessage);
       }
